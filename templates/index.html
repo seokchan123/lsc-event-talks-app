@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BigQuery Release Notes Explorer & Tweet Composer</title>
+  <meta name="description" content="Explore BigQuery Release Notes, filter updates, and tweet about specific releases instantly.">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22%231a73e8%22><path d=%22M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.96.76 1.58V19z%22/></svg>">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">
+          <!-- BigQuery / Google Cloud Database Icon -->
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <div class="title-row">
+            <h1>BigQuery Release Notes</h1>
+            <span class="badge feed-badge">Official RSS Feed</span>
+          </div>
+          <p class="subtitle">Stay updated with Google Cloud BigQuery news and share highlights directly to X / Twitter</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Refresh Button with Spinner -->
+        <button id="refresh-btn" class="btn btn-primary refresh-button" title="Fetch latest updates from Google Cloud">
+          <svg id="refresh-spinner" class="spinner-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span id="refresh-btn-label">Refresh Feed</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Controls Bar: Search, Stats, Filters -->
+  <section class="controls-section">
+    <div class="controls-container">
+      <div class="meta-row">
+        <div class="stats-group">
+          <span class="stat-pill">
+            <strong id="total-updates-count">-</strong> updates
+          </span>
+          <span class="stat-pill">
+            <strong id="total-dates-count">-</strong> releases
+          </span>
+          <span class="status-time" id="last-fetched-text">Checking feed...</span>
+        </div>
+      </div>
+
+      <div class="filter-search-row">
+        <!-- Search input -->
+        <div class="search-box">
+          <svg class="search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="search-input" placeholder="Search updates (e.g. AI, SQL, vector, tables, Iceberg)..." autocomplete="off">
+          <button id="search-clear-btn" class="clear-btn" title="Clear search" style="display: none;">&times;</button>
+        </div>
+
+        <!-- Category filter pills -->
+        <div class="category-pills" id="category-pills-container">
+          <button class="pill active" data-category="all">
+            All <span class="pill-count" id="count-all">0</span>
+          </button>
+          <button class="pill pill-feature" data-category="Feature">
+            Features <span class="pill-count" id="count-Feature">0</span>
+          </button>
+          <button class="pill pill-change" data-category="Change">
+            Changes <span class="pill-count" id="count-Change">0</span>
+          </button>
+          <button class="pill pill-announcement" data-category="Announcement">
+            Announcements <span class="pill-count" id="count-Announcement">0</span>
+          </button>
+          <button class="pill pill-fixed" data-category="Fixed">
+            Fixes <span class="pill-count" id="count-Fixed">0</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content Stream -->
+  <main class="main-container">
+    <!-- Loading State Skeleton -->
+    <div id="loading-state" class="state-container">
+      <div class="loading-spinner-large"></div>
+      <p class="state-title">Fetching BigQuery release notes...</p>
+      <p class="state-desc">Connecting to Google Cloud feed at docs.cloud.google.com</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error-state" class="state-container error-state" style="display: none;">
+      <div class="state-icon error-icon">⚠️</div>
+      <p class="state-title" id="error-title">Unable to load release notes</p>
+      <p class="state-desc" id="error-message">A network error occurred while communicating with the feed.</p>
+      <button id="error-retry-btn" class="btn btn-primary">Try Again</button>
+    </div>
+
+    <!-- Empty Search Results State -->
+    <div id="empty-state" class="state-container empty-state" style="display: none;">
+      <div class="state-icon">🔍</div>
+      <p class="state-title">No matching updates found</p>
+      <p class="state-desc">Try adjusting your search terms or selecting a different category filter.</p>
+      <button id="empty-reset-btn" class="btn btn-secondary">Clear Filters</button>
+    </div>
+
+    <!-- Release Notes Feed Container -->
+    <div id="release-notes-feed" class="feed-container" style="display: none;">
+      <!-- Content populated dynamically via JS -->
+    </div>
+  </main>
+
+  <!-- Sticky / Floating Bottom Selection Bar -->
+  <div id="floating-selection-bar" class="floating-bar" style="display: none;">
+    <div class="floating-bar-content">
+      <div class="selection-info">
+        <span class="selection-check">✓</span>
+        <div class="selection-text">
+          <span class="selection-label">1 update selected</span>
+          <span class="selection-title" id="selection-summary-text">Feature - October 22, 2026</span>
+        </div>
+      </div>
+      <div class="floating-actions">
+        <button id="btn-floating-tweet" class="btn btn-tweet">
+          <svg class="x-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Compose Tweet
+        </button>
+        <button id="btn-floating-quick-tweet" class="btn btn-outline" title="Tweet draft directly to X">
+          Quick Tweet ↗
+        </button>
+        <button id="btn-floating-copy" class="btn btn-icon-only" title="Copy plain text to clipboard">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+        </button>
+        <button id="btn-floating-clear" class="btn btn-icon-only" title="Clear selection">
+          &times;
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tweet Composer Modal -->
+  <div id="tweet-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <svg class="x-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          <h2>Tweet BigQuery Update</h2>
+        </div>
+        <button id="modal-close-btn" class="modal-close-btn" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Selected update metadata tag -->
+        <div class="tweet-meta-preview">
+          <span id="modal-update-category" class="badge">Feature</span>
+          <span id="modal-update-date" class="meta-date">October 22, 2026</span>
+          <a id="modal-update-link" href="#" target="_blank" rel="noopener noreferrer" class="meta-doc-link">Official Doc ↗</a>
+        </div>
+
+        <!-- Editable Tweet Textarea -->
+        <div class="textarea-wrapper">
+          <label for="tweet-textarea" class="visually-hidden">Tweet Text</label>
+          <textarea id="tweet-textarea" rows="5" placeholder="Draft your tweet here..."></textarea>
+        </div>
+
+        <!-- Quick hashtag toggle pills -->
+        <div class="hashtag-row">
+          <span class="hashtag-label">Add tags:</span>
+          <div class="hashtag-chips" id="hashtag-chips">
+            <button class="chip active" data-tag="#BigQuery">#BigQuery</button>
+            <button class="chip active" data-tag="#GoogleCloud">#GoogleCloud</button>
+            <button class="chip" data-tag="#GCP">#GCP</button>
+            <button class="chip" data-tag="#DataAnalytics">#DataAnalytics</button>
+            <button class="chip" data-tag="#GenAI">#GenAI</button>
+          </div>
+        </div>
+
+        <!-- Character Counter & Meter -->
+        <div class="counter-row">
+          <div class="counter-display">
+            <span id="char-count">0</span> / <span class="max-chars">280</span> characters
+          </div>
+          <div class="char-meter-bar">
+            <div id="char-meter-fill" class="char-meter-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="modal-copy-btn" class="btn btn-secondary">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span id="modal-copy-text">Copy Text</span>
+        </button>
+        <button id="modal-tweet-btn" class="btn btn-tweet">
+          <svg class="x-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+          </svg>
+          Post on X / Twitter
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="toast-notification"></div>
+
+  <!-- Vanilla JavaScript -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
