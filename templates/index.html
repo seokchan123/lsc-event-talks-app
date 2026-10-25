@@ -3,10 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light dark">
   <title>BigQuery Release Notes Explorer</title>
   <meta name="description" content="Browse, search, and share official Google Cloud BigQuery release notes and updates.">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⚡</text></svg>">
+  <script>
+    // FOUC prevention script: immediately applies saved theme before body renders
+    try {
+      const savedTheme = localStorage.getItem('theme-preference');
+      if (savedTheme) {
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        const meta = document.querySelector('meta[name="color-scheme"]');
+        if (meta) meta.content = savedTheme;
+      }
+    } catch (e) {}
+  </script>
 </head>
 <body>
   <!-- Header Banner -->
@@ -31,6 +43,29 @@
           <span class="status-dot"></span>
           <span id="last-updated-text">Checking for updates...</span>
         </div>
+
+        <!-- Dark / Light Mode Switch Button -->
+        <button id="theme-toggle-btn" class="btn btn-secondary theme-toggle-btn" type="button" aria-label="Toggle dark/light mode" title="다크 모드 / 라이트 모드 전환">
+          <span class="theme-icon sun-icon hidden" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+          </span>
+          <span class="theme-icon moon-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </span>
+          <span id="theme-toggle-text" class="theme-toggle-text">다크 모드</span>
+        </button>
 
         <button id="refresh-btn" class="btn btn-primary" type="button" aria-label="Refresh feed">
           <span class="btn-icon refresh-icon" aria-hidden="true">
@@ -70,7 +105,7 @@
     <div id="selection-bar" class="selection-bar hidden" role="region" aria-label="Batch actions">
       <div class="selection-info">
         <span class="selection-badge" id="selected-count">0</span>
-        <span>items selected</span>
+        <span>개 선택됨</span>
       </div>
       <div class="selection-actions">
         <button id="tweet-selected-btn" class="btn btn-tweet" type="button">
@@ -79,7 +114,15 @@
           </svg>
           Tweet Selected
         </button>
-        <button id="clear-selection-btn" class="btn btn-secondary" type="button">Clear Selection</button>
+        <button id="export-selected-csv-btn" class="btn btn-secondary" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+          </svg>
+          선택 항목 CSV 내보내기
+        </button>
+        <button id="clear-selection-btn" class="btn btn-secondary" type="button">선택 해제</button>
       </div>
     </div>
 

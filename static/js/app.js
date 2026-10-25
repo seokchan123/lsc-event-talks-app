@@ -20,6 +20,10 @@
 
   // DOM Elements
   const elements = {
+    themeToggleBtn: document.getElementById('theme-toggle-btn'),
+    sunIcon: document.querySelector('.sun-icon'),
+    moonIcon: document.querySelector('.moon-icon'),
+    themeToggleText: document.getElementById('theme-toggle-text'),
     refreshBtn: document.getElementById('refresh-btn'),
     refreshIcon: document.querySelector('.refresh-icon'),
     refreshSpinner: document.getElementById('refresh-spinner'),
@@ -32,6 +36,7 @@
     selectionBar: document.getElementById('selection-bar'),
     selectedCount: document.getElementById('selected-count'),
     tweetSelectedBtn: document.getElementById('tweet-selected-btn'),
+    exportSelectedCsvBtn: document.getElementById('export-selected-csv-btn'),
     clearSelectionBtn: document.getElementById('clear-selection-btn'),
     alertBanner: document.getElementById('alert-banner'),
     feedLoading: document.getElementById('feed-loading'),
@@ -54,8 +59,59 @@
    * Initializes the application
    */
   function init() {
+    initTheme();
     bindEvents();
     loadReleases(false);
+  }
+
+  /**
+   * Theme Manager: Toggles Dark / Light mode by overriding root CSS variables
+   */
+  function initTheme() {
+    const savedTheme = localStorage.getItem('theme-preference');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const initialTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+    
+    applyTheme(initialTheme, false);
+
+    if (elements.themeToggleBtn) {
+      elements.themeToggleBtn.addEventListener('click', () => {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 
+                             (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(nextTheme, true);
+        showToast(nextTheme === 'dark' ? '다크 모드로 전환되었습니다.' : '라이트 모드로 전환되었습니다.');
+      });
+    }
+
+    // Listen to OS theme changes if user hasn't set explicit preference
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem('theme-preference')) {
+        applyTheme(e.matches ? 'dark' : 'light', false);
+      }
+    });
+  }
+
+  function applyTheme(theme, save = true) {
+    document.documentElement.setAttribute('data-theme', theme);
+    const meta = document.querySelector('meta[name="color-scheme"]');
+    if (meta) {
+      meta.content = theme;
+    }
+    if (save) {
+      localStorage.setItem('theme-preference', theme);
+    }
+    updateThemeToggleUI(theme);
+  }
+
+  function updateThemeToggleUI(theme) {
+    const isDark = theme === 'dark';
+    if (elements.sunIcon && elements.moonIcon && elements.themeToggleText) {
+      elements.sunIcon.classList.toggle('hidden', !isDark);
+      elements.moonIcon.classList.toggle('hidden', isDark);
+      elements.themeToggleText.textContent = isDark ? '라이트 모드' : '다크 모드';
+      elements.themeToggleBtn.setAttribute('title', isDark ? '라이트 모드로 전환' : '다크 모드로 전환');
+    }
   }
 
   /**
@@ -106,9 +162,29 @@
       renderFeed();
     });
 
-    // Cards Grid interaction (Checkbox & Tweet buttons)
+    // Cards Grid interaction: Checkbox, Tweet, Copy, and CSV buttons
     elements.cardsGrid.addEventListener('click', (e) => {
-      // Tweet button clicked on a card
+      // 1. Copy to clipboard on card
+      const copyBtn = e.target.closest('.btn-card-copy');
+      if (copyBtn) {
+        e.stopPropagation();
+        const itemId = copyBtn.getAttribute('data-id');
+        const item = state.items.find(it => it.id === itemId);
+        if (item) copyCardToClipboard(item, copyBtn);
+        return;
+      }
+
+      // 2. Export single card to CSV
+      const csvBtn = e.target.closest('.btn-card-csv');
+      if (csvBtn) {
+        e.stopPropagation();
+        const itemId = csvBtn.getAttribute('data-id');
+        const item = state.items.find(it => it.id === itemId);
+        if (item) exportItemsToCsv([item], `bigquery-${item.id}.csv`);
+        return;
+      }
+
+      // 3. Tweet button clicked on a card
       const tweetBtn = e.target.closest('.btn-card-tweet');
       if (tweetBtn) {
         e.stopPropagation();
@@ -117,7 +193,7 @@
         return;
       }
 
-      // Checkbox changed or card clicked
+      // 4. Checkbox toggled
       const checkbox = e.target.closest('.item-checkbox');
       if (checkbox) {
         const itemId = checkbox.getAttribute('data-id');
@@ -125,7 +201,7 @@
         return;
       }
 
-      // Clicking card background toggles selection if clicked outside interactive elements
+      // 5. Clicking card background toggles selection
       const card = e.target.closest('.release-card');
       if (card && !e.target.closest('a') && !e.target.closest('button')) {
         const itemId = card.getAttribute('data-id');
@@ -149,6 +225,15 @@
       }
     });
 
+    if (elements.exportSelectedCsvBtn) {
+      elements.exportSelectedCsvBtn.addEventListener('click', () => {
+        const selectedItems = state.items.filter(it => state.selectedIds.has(it.id));
+        if (selectedItems.length > 0) {
+          exportItemsToCsv(selectedItems, `bigquery-selected-${selectedItems.length}-releases.csv`);
+        }
+      });
+    }
+
     // Modal dialog controls
     elements.closeModalBtn.addEventListener('click', () => {
       elements.tweetModal.close();
@@ -171,18 +256,18 @@
       updateCharCounter();
     });
 
-    // Copy to clipboard
+    // Copy to clipboard from modal
     elements.copyTweetBtn.addEventListener('click', async () => {
       const text = elements.tweetTextarea.value;
       try {
         await navigator.clipboard.writeText(text);
-        showToast('Copied to clipboard!');
-        elements.copyBtnText.textContent = 'Copied!';
+        showToast('트윗 내용이 클립보드에 복사되었습니다!');
+        elements.copyBtnText.textContent = '복사됨!';
         setTimeout(() => {
           elements.copyBtnText.textContent = 'Copy to Clipboard';
         }, 2000);
       } catch (err) {
-        showToast('Failed to copy. Please select and copy manually.');
+        showToast('복사에 실패했습니다.');
       }
     });
 
@@ -196,8 +281,69 @@
       const left = Math.max(0, (window.innerWidth - width) / 2 + window.screenX);
       const top = Math.max(0, (window.innerHeight - height) / 2 + window.screenY);
       window.open(intentUrl, 'twitter_tweet', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
-      showToast('Opening Twitter / X post composer...');
+      showToast('Twitter / X 작성창을 열었습니다.');
     });
+  }
+
+  /**
+   * Utility 1: Copy single card details to clipboard
+   */
+  async function copyCardToClipboard(item, btnElement) {
+    const textToCopy = `[BigQuery 릴리스 노트] ${item.date} - ${item.category}\n` +
+                       `헤드라인: ${item.headline}\n` +
+                       `요약: ${item.summary_text}\n` +
+                       `원문 링크: ${item.link || 'https://cloud.google.com/bigquery/docs/release-notes'}`;
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+      showToast('클립보드에 복사되었습니다.');
+      
+      if (btnElement) {
+        const originalHtml = btnElement.innerHTML;
+        btnElement.classList.add('copied');
+        btnElement.innerHTML = `
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+          <span class="btn-text">복사됨!</span>
+        `;
+        setTimeout(() => {
+          btnElement.classList.remove('copied');
+          btnElement.innerHTML = originalHtml;
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Copy failed:', err);
+      showToast('클립보드 복사에 실패했습니다.');
+    }
+  }
+
+  /**
+   * Utility 2: Export items to RFC 4180 compliant CSV file with UTF-8 BOM
+   */
+  function exportItemsToCsv(items, filename) {
+    if (!items || items.length === 0) return;
+
+    const headers = ['ID', 'Date', 'Category', 'Headline', 'Summary', 'Doc_Link'];
+    const rows = items.map(item => [
+      item.id,
+      item.date,
+      item.category,
+      item.headline,
+      item.summary_text,
+      item.link || ''
+    ].map(val => `"${String(val || '').replace(/"/g, '""')}"`).join(','));
+
+    // Prepend UTF-8 BOM (\uFEFF) for Microsoft Excel compatibility
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'bigquery-releases.csv';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    showToast(`${items.length}개 항목이 CSV 파일로 다운로드되었습니다.`);
   }
 
   /**
@@ -230,13 +376,13 @@
       renderFeed();
 
       if (forceRefresh) {
-        showToast('Feed refreshed successfully!');
+        showToast('피드를 최신 정보로 새로고침했습니다!');
       }
     } catch (err) {
       console.error('Error fetching releases:', err);
-      elements.alertBanner.textContent = `Could not refresh feed: ${err.message}. Please try again later.`;
+      elements.alertBanner.textContent = `피드를 가져올 수 없습니다: ${err.message}. 잠시 후 다시 시도해 주세요.`;
       elements.alertBanner.classList.remove('hidden');
-      showToast('Failed to refresh feed.');
+      showToast('피드 새로고침에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -309,7 +455,7 @@
   }
 
   /**
-   * Renders the feed cards according to current category and search query
+   * Renders the feed cards with utility buttons and tweet actions
    */
   function renderFeed() {
     let filtered = state.items;
@@ -344,8 +490,6 @@
     elements.cardsGrid.innerHTML = filtered.map(item => {
       const isSelected = state.selectedIds.has(item.id);
       const categoryClass = getBadgeClass(item.category);
-
-      // Ensure links inside content open safely in a new tab
       const sanitizedContent = sanitizeAndFormatHtml(item.content_html || item.summary_text);
 
       return `
@@ -365,23 +509,47 @@
           </div>
 
           <div class="card-footer">
-            ${item.link ? `
-              <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer" class="btn-icon-link">
-                <span>Release Doc</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
-                  <polyline points="15 3 21 3 21 9"></polyline>
-                  <line x1="10" y1="14" x2="21" y2="3"></line>
-                </svg>
-              </a>
-            ` : '<span></span>'}
+            <div class="card-footer-left">
+              ${item.link ? `
+                <a href="${escapeHtml(item.link)}" target="_blank" rel="noopener noreferrer" class="btn-icon-link" title="공식 릴리스 문서 열기">
+                  <span>문서 보기</span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                </a>
+              ` : '<span></span>'}
+            </div>
 
-            <button type="button" class="btn btn-tweet btn-card-tweet" data-id="${escapeHtml(item.id)}" aria-label="Tweet this update">
-              <svg class="x-logo" width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-              </svg>
-              Tweet
-            </button>
+            <div class="card-footer-actions">
+              <!-- Utility 1: Copy to clipboard -->
+              <button type="button" class="btn btn-utility btn-card-copy" data-id="${escapeHtml(item.id)}" title="요약 내용을 클립보드에 복사" aria-label="클립보드에 복사">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span class="btn-text">복사</span>
+              </button>
+
+              <!-- Utility 2: Export to CSV -->
+              <button type="button" class="btn btn-utility btn-card-csv" data-id="${escapeHtml(item.id)}" title="이 항목을 CSV 파일로 다운로드" aria-label="CSV로 내보내기">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                <span class="btn-text">CSV</span>
+              </button>
+
+              <!-- Tweet button -->
+              <button type="button" class="btn btn-tweet btn-card-tweet" data-id="${escapeHtml(item.id)}" aria-label="Tweet this update">
+                <svg class="x-logo" width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                </svg>
+                <span>Tweet</span>
+              </button>
+            </div>
           </div>
         </article>
       `;
@@ -454,12 +622,10 @@
       const item = selectedItems[0];
       primaryLink = item.link || 'https://cloud.google.com/bigquery/docs/release-notes';
 
-      // Build concise draft
       const headline = item.headline || `${item.category} Update`;
       const dateSnippet = item.date;
       let summary = item.summary_text || '';
 
-      // Draft base template
       const prefix = `BigQuery [${item.category}] (${dateSnippet}):\n${headline}`;
       const hashtags = '#BigQuery #GoogleCloud';
       const maxSummaryLen = 280 - (prefix.length + hashtags.length + primaryLink.length + 8);
@@ -470,7 +636,6 @@
 
       defaultTweet = `${prefix}\n\n${summary}\n\n${primaryLink}\n${hashtags}`;
     } else {
-      // Multi-select tweet draft
       primaryLink = 'https://cloud.google.com/bigquery/docs/release-notes';
       const bullets = selectedItems.slice(0, 3).map(it => `• [${it.category}] ${it.headline}`).join('\n');
       const moreCount = selectedItems.length > 3 ? `\n...and ${selectedItems.length - 3} more updates` : '';
@@ -512,7 +677,6 @@
    */
   function sanitizeAndFormatHtml(rawHtml) {
     if (!rawHtml) return '';
-    // Rewrite all <a> tags to target="_blank" rel="noopener noreferrer"
     let formatted = rawHtml.replace(/<a\s+(?:[^>]*?\s+)?href="([^"]*)"([^>]*)>/gi, (match, href) => {
       return `<a href="${href}" target="_blank" rel="noopener noreferrer">`;
     });
@@ -542,7 +706,7 @@
     elements.toast.classList.remove('hidden');
     toastTimer = setTimeout(() => {
       elements.toast.classList.add('hidden');
-    }, 3000);
+    }, 2500);
   }
 
   // Start the application when DOM is ready

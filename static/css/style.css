@@ -53,11 +53,14 @@
   --x-hover: #272c30;
 
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  color-scheme: light;
+  color-scheme: light dark;
 }
 
+/* ==========================================================================
+   Dark Theme: System preference fallback & Explicit Override
+   ========================================================================== */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg-page: #121316;
     --bg-surface: #1e1f23;
     --bg-card: #1e1f23;
@@ -93,9 +96,105 @@
     --badge-fixed-bg: #082f49;
     --badge-fixed-text: #7dd3fc;
     --badge-fixed-border: #0c4a6e;
-    
+
+    --badge-general-bg: #2d3135;
+    --badge-general-text: #bdc1c6;
+    --badge-general-border: #3c4043;
+
     color-scheme: dark;
   }
+}
+
+:root[data-theme="dark"] {
+  --bg-page: #121316;
+  --bg-surface: #1e1f23;
+  --bg-card: #1e1f23;
+  --bg-hover: #282a30;
+  
+  --text-main: #f1f3f4;
+  --text-muted: #bdc1c6;
+  --text-subtle: #9aa0a6;
+  
+  --border-light: #3c4043;
+  --border-subtle: #2d3135;
+  
+  --primary: #8ab4f8;
+  --primary-hover: #aecbfa;
+  --primary-light: #172b4d;
+  --primary-border: #29426f;
+  
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 3px 8px rgba(0,0,0,0.5);
+  
+  --badge-feature-bg: #0f3820;
+  --badge-feature-text: #81c995;
+  --badge-feature-border: #1e4620;
+  
+  --badge-announcement-bg: #351c4a;
+  --badge-announcement-text: #d7aefb;
+  --badge-announcement-border: #4d2d6b;
+  
+  --badge-change-bg: #402c00;
+  --badge-change-text: #fdd663;
+  --badge-change-border: #573c00;
+  
+  --badge-fixed-bg: #082f49;
+  --badge-fixed-text: #7dd3fc;
+  --badge-fixed-border: #0c4a6e;
+
+  --badge-general-bg: #2d3135;
+  --badge-general-text: #bdc1c6;
+  --badge-general-border: #3c4043;
+
+  color-scheme: dark;
+}
+
+/* ==========================================================================
+   Light Theme Explicit Override
+   ========================================================================== */
+:root[data-theme="light"] {
+  --bg-page: #f8f9fa;
+  --bg-surface: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f3f4;
+  
+  --text-main: #202124;
+  --text-muted: #5f6368;
+  --text-subtle: #80868b;
+  
+  --border-light: #dadce0;
+  --border-subtle: #eaedf0;
+  
+  --primary: #1a73e8;
+  --primary-hover: #1557b0;
+  --primary-light: #e8f0fe;
+  --primary-border: #c2e7ff;
+  
+  --shadow-sm: 0 1px 2px rgba(60, 64, 67, 0.1), 0 1px 3px 1px rgba(60, 64, 67, 0.05);
+  --shadow-md: 0 2px 6px rgba(60, 64, 67, 0.15), 0 1px 2px rgba(60, 64, 67, 0.1);
+  --shadow-lg: 0 4px 12px rgba(60, 64, 67, 0.2);
+  
+  --badge-feature-bg: #e6f4ea;
+  --badge-feature-text: #137333;
+  --badge-feature-border: #ceead6;
+  
+  --badge-announcement-bg: #f3e8fd;
+  --badge-announcement-text: #7627bb;
+  --badge-announcement-border: #e9d2fd;
+  
+  --badge-change-bg: #fef7e0;
+  --badge-change-text: #b06000;
+  --badge-change-border: #feefc3;
+  
+  --badge-fixed-bg: #e0f2fe;
+  --badge-fixed-text: #0284c7;
+  --badge-fixed-border: #bae6fd;
+
+  --badge-general-bg: #f1f3f4;
+  --badge-general-text: #3c4043;
+  --badge-general-border: #dadce0;
+
+  color-scheme: light;
 }
 
 /* ==========================================================================
@@ -114,6 +213,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 a {
@@ -243,6 +343,7 @@ progress.loading-spinner.large-spinner {
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow-sm);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
 }
 
 .header-container {
@@ -288,7 +389,8 @@ progress.loading-spinner.large-spinner {
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .status-indicator {
@@ -309,6 +411,22 @@ progress.loading-spinner.large-spinner {
 
 .status-dot.stale {
   background-color: #fbbc04;
+}
+
+/* Theme Toggle Button */
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font-size: 0.825rem;
+  font-weight: 500;
+  border-radius: var(--radius-full);
+}
+
+.theme-icon {
+  display: inline-flex;
+  align-items: center;
 }
 
 /* ==========================================================================
@@ -354,10 +472,37 @@ progress.loading-spinner.large-spinner {
   background-color: var(--x-black);
   color: #ffffff;
   border-radius: var(--radius-full);
-  padding: 7px 14px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
 }
 .btn-tweet:hover {
   background-color: var(--x-hover);
+}
+
+.btn-utility {
+  background-color: var(--bg-surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-full);
+  padding: 5px 11px;
+  font-size: 0.775rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+.btn-utility:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+  border-color: var(--border-subtle);
+}
+
+.btn-utility.copied {
+  background-color: #34a853;
+  color: #ffffff;
+  border-color: #34a853;
 }
 
 .btn-icon-link {
@@ -488,6 +633,8 @@ progress.loading-spinner.large-spinner {
   border-radius: var(--radius-md);
   margin-bottom: 20px;
   animation: slideDown 0.2s ease;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .selection-info {
@@ -511,6 +658,7 @@ progress.loading-spinner.large-spinner {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 @keyframes slideDown {
@@ -664,9 +812,23 @@ progress.loading-spinner.large-spinner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 12px;
+  gap: 10px;
+  padding-top: 14px;
   border-top: 1px solid var(--border-subtle);
   margin-top: auto;
+  flex-wrap: wrap;
+}
+
+.card-footer-left {
+  display: flex;
+  align-items: center;
+}
+
+.card-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
 /* ==========================================================================

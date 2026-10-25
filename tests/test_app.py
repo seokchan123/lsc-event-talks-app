@@ -14,6 +14,7 @@ def test_index_route(client):
     assert "BigQuery Release Notes" in html
     assert "refresh-btn" in html
     assert "tweet-modal" in html
+    assert "theme-toggle-btn" in html
 
 def test_api_releases_route(client):
     response = client.get("/api/releases")
